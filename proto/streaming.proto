@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package streaming;
+
+// ===== Mensagens de domínio =====
+
+message User {
+  int32 id = 1;
+  string nome = 2;
+  int32 idade = 3;
+}
+
+message Music {
+  int32 id = 1;
+  string nome = 2;
+  string artista = 3;
+  int32 ano = 4;
+  string album = 5;
+}
+
+message Playlist {
+  int32 id = 1;
+  string nome = 2;
+  int32 usuarioId = 3;
+  repeated int32 musicaIds = 4;
+}
+
+// ===== Requests / Responses =====
+
+message Empty {}
+message IdRequest { int32 id = 1; }
+
+message Users { repeated User users = 1; }
+message Musics { repeated Music musics = 1; }
+message Playlists { repeated Playlist playlists = 1; }
+
+// Create/Update payloads (sem id no create; id vem na chamada para update)
+message UserInput { string nome = 1; int32 idade = 2; }
+message UserUpdate { int32 id = 1; string nome = 2; int32 idade = 3; }
+
+message MusicInput { string nome = 1; string artista = 2; int32 ano = 3; string album = 4; }
+message MusicUpdate { int32 id = 1; string nome = 2; string artista = 3; int32 ano = 4; string album = 5; }
+
+message PlaylistInput { string nome = 1; int32 usuarioId = 2; repeated int32 musicaIds = 3; }
+message PlaylistUpdate { int32 id = 1; string nome = 2; int32 usuarioId = 3; repeated int32 musicaIds = 4; }
+
+// ===== Serviço =====
+
+service StreamingService {
+  // ---- Usuários (CRUD) ----
+  rpc ListUsers(Empty) returns (Users);
+  rpc GetUser(IdRequest) returns (User);
+  rpc CreateUser(UserInput) returns (User);
+  rpc UpdateUser(UserUpdate) returns (User);
+  rpc DeleteUser(IdRequest) returns (Empty);
+
+  // ---- Músicas (CRUD) ----
+  rpc ListMusics(Empty) returns (Musics);
+  rpc GetMusic(IdRequest) returns (Music);
+  rpc CreateMusic(MusicInput) returns (Music);
+  rpc UpdateMusic(MusicUpdate) returns (Music);
+  rpc DeleteMusic(IdRequest) returns (Empty);
+
+  // ---- Playlists (CRUD) ----
+  rpc ListPlaylists(Empty) returns (Playlists);
+  rpc GetPlaylist(IdRequest) returns (Playlist);
+  rpc CreatePlaylist(PlaylistInput) returns (Playlist);
+  rpc UpdatePlaylist(PlaylistUpdate) returns (Playlist);
+  rpc DeletePlaylist(IdRequest) returns (Empty);
+
+  // ---- Consultas relacionais (as 5 do enunciado) ----
+  rpc PlaylistsByUser(IdRequest) returns (Playlists);    // playlists de um usuário
+  rpc MusicsByPlaylist(IdRequest) returns (Musics);      // músicas de uma playlist
+  rpc PlaylistsByMusic(IdRequest) returns (Playlists);   // playlists que contêm a música
+}

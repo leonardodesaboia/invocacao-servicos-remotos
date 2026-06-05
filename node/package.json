@@ -1,0 +1,20 @@
+{
+  "name": "streaming-services-node",
+  "version": "1.0.0",
+  "description": "Serviço de streaming de músicas em REST, GraphQL, gRPC e SOAP (Node.js)",
+  "private": true,
+  "scripts": {
+    "rest": "node rest/server.js",
+    "graphql": "node graphql/server.js",
+    "grpc": "node grpc/server.js",
+    "soap": "node soap/server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "graphql": "^16.9.0",
+    "graphql-http": "^1.22.3",
+    "@grpc/grpc-js": "^1.12.5",
+    "@grpc/proto-loader": "^0.7.13",
+    "soap": "^1.1.5"
+  }
+}
