@@ -257,25 +257,23 @@ for m in musics.musics:
 
 ## 2. Comparação Geral
 
-```
-╔══════════════════╦══════════╦══════════╦══════════╦══════════╗
-║ Critério         ║  SOAP    ║  REST    ║ GraphQL  ║  gRPC    ║
-╠══════════════════╬══════════╬══════════╬══════════╬══════════╣
-║ Protocolo        ║ HTTP/SMTP║   HTTP   ║   HTTP   ║  HTTP/2  ║
-║ Formato          ║   XML    ║   JSON   ║   JSON   ║  Binário ║
-║ Contrato formal  ║  WSDL ✓  ║  ✗ (*)  ║  SDL ✓  ║ .proto ✓ ║
-║ Fortemente tipado║    ✓     ║    ✗     ║    ✓     ║    ✓     ║
-║ Performance      ║  Baixa   ║  Média   ║  Média   ║  Alta    ║
-║ Legibilidade     ║  Baixa   ║  Alta    ║  Alta    ║  Baixa   ║
-║ Caching HTTP     ║  Difícil ║  ✓ GET  ║  Difícil ║    ✗     ║
-║ Streaming        ║    ✗     ║    ✗     ║  Parcial ║    ✓     ║
-║ Browser nativo   ║   Sim    ║   Sim    ║   Sim    ║  Não (**) ║
-║ Overfetching     ║   Sim    ║   Sim    ║   Não    ║   Não    ║
-║ Uso típico       ║Enterprise║  APIs   ║ Frontend ║Microsserv║
-╚══════════════════╩══════════╩══════════╩══════════╩══════════╝
-  (*) OpenAPI/Swagger é amplamente adotado como contrato informal
- (**) Requer gRPC-Web ou proxy
-```
+A tabela abaixo resume as principais diferenças entre SOAP, REST, GraphQL e gRPC considerando protocolo, formato de dados, contrato, desempenho e cenário de uso.
+
+| Critério | SOAP | REST | GraphQL | gRPC |
+|---|---|---|---|---|
+| Protocolo principal | HTTP/SMTP | HTTP | HTTP | HTTP/2 |
+| Formato de dados | XML | JSON | JSON | Binário |
+| Contrato formal | WSDL | Não nativo, mas pode usar OpenAPI/Swagger | Schema SDL | `.proto` |
+| Tipagem forte | Sim | Não nativa | Sim | Sim |
+| Performance esperada | Baixa | Média | Média | Alta |
+| Legibilidade | Baixa, por usar XML verboso | Alta | Alta | Baixa, por usar payload binário |
+| Cache HTTP | Mais difícil | Sim, principalmente com GET | Mais difícil | Não é o foco |
+| Streaming | Não nativo | Não nativo | Parcial | Nativo |
+| Uso em browser | Sim | Sim | Sim | Requer gRPC-Web ou proxy |
+| Problema de overfetching | Pode ocorrer | Pode ocorrer | Reduzido | Reduzido |
+| Uso típico | Sistemas enterprise e legados | APIs públicas e web/mobile | APIs flexíveis para frontends | Microsserviços e comunicação interna de alta performance |
+
+De forma geral, REST é a alternativa mais simples e popular para APIs web. GraphQL é útil quando o cliente precisa controlar exatamente os dados recebidos. SOAP é mais comum em sistemas legados ou corporativos que exigem contrato formal e padrões de segurança. Já o gRPC é indicado quando desempenho, baixa latência e comunicação entre serviços são prioridades.
 
 ### Fluxo de comunicação
 
@@ -331,15 +329,17 @@ O serviço gerencia três recursos relacionados entre si:
                                  └────────────────────┘
 ```
 
+As operações abaixo foram implementadas nas quatro tecnologias para permitir uma comparação justa. A ideia foi manter a mesma lógica de negócio e o mesmo conjunto de dados, mudando apenas a forma de invocação remota. Assim, a diferença observada nos testes está mais relacionada ao protocolo, ao formato de mensagem e às bibliotecas utilizadas em cada tecnologia.
+
 **Operações suportadas por todas as implementações:**
 
-| # | Consulta | REST | GraphQL | gRPC |
-|---|---|---|---|---|
-| 1 | Todos os usuários | `GET /users` | `{ users { id nome } }` | `ListUsers(Empty)` |
-| 2 | Todas as músicas | `GET /musics` | `{ musics { id nome } }` | `ListMusics(Empty)` |
-| 3 | Playlists de um usuário | `GET /users/1/playlists` | `{ playlistsByUser(userId:1) { nome } }` | `PlaylistsByUser({id:1})` |
-| 4 | Músicas de uma playlist | `GET /playlists/1/musics` | `{ musicsByPlaylist(playlistId:1) { nome } }` | `MusicsByPlaylist({id:1})` |
-| 5 | Playlists com certa música | `GET /musics/1/playlists` | `{ playlistsByMusic(musicId:1) { nome } }` | `PlaylistsByMusic({id:1})` |
+| # | Consulta | REST | GraphQL | gRPC | SOAP |
+|---|---|---|---|---|---|
+| 1 | Todos os usuários | `GET /users` | `{ users { id nome } }` | `ListUsers(Empty)` | `listUsers()` |
+| 2 | Todas as músicas | `GET /musics` | `{ musics { id nome } }` | `ListMusics(Empty)` | `listMusics()` |
+| 3 | Playlists de um usuário | `GET /users/1/playlists` | `{ playlistsByUser(userId:1) { nome } }` | `PlaylistsByUser({id:1})` | `playlistsByUser(userId:1)` |
+| 4 | Músicas de uma playlist | `GET /playlists/1/musics` | `{ musicsByPlaylist(playlistId:1) { nome } }` | `MusicsByPlaylist({id:1})` | `musicsByPlaylist(playlistId:1)` |
+| 5 | Playlists com certa música | `GET /musics/1/playlists` | `{ playlistsByMusic(musicId:1) { nome } }` | `PlaylistsByMusic({id:1})` | `playlistsByMusic(musicId:1)` |
 
 ---
 
@@ -353,10 +353,15 @@ O serviço gerencia três recursos relacionados entre si:
 │   └── streaming.proto          # Contrato gRPC (compartilhado entre Python e Node)
 ├── python/
 │   ├── common/
-│   │   └── store.py             # Store em memória (lógica de negócio)
+│   │   ├── store.py             # Store em memória (lógica de negócio)
+│   │   ├── spyne_py312_fix.py   # Compatibilidade spyne + Python 3.12
+│   │   └── __init__.py
 │   ├── rest/     server.py      # Flask        → porta 8001
 │   ├── graphql/  server.py      # Ariadne       → porta 8002
-│   ├── grpc/     server.py      # grpcio        → porta 8003
+│   ├── grpc/
+│   │   ├── server.py            # grpcio        → porta 8003
+│   │   ├── streaming_pb2.py     # gerado por protoc
+│   │   └── streaming_pb2_grpc.py# gerado por protoc
 │   └── soap/     server.py      # spyne         → porta 8004
 ├── node/
 │   ├── common/
@@ -377,6 +382,8 @@ O serviço gerencia três recursos relacionados entre si:
 
 ### Bibliotecas utilizadas
 
+As bibliotecas foram escolhidas de acordo com a tecnologia implementada em cada linguagem. Em Python, foram utilizadas bibliotecas comuns para criação de serviços HTTP, GraphQL, SOAP e gRPC. Em Node.js, foram utilizadas bibliotecas equivalentes para manter a comparação entre as duas linguagens.
+
 | Tecnologia | Python | Node.js |
 |---|---|---|
 | REST    | Flask | Express |
@@ -384,24 +391,31 @@ O serviço gerencia três recursos relacionados entre si:
 | gRPC    | grpcio + grpcio-tools | @grpc/grpc-js + @grpc/proto-loader |
 | SOAP    | spyne + lxml | soap |
 
+Essa diferença de bibliotecas também influencia os resultados. Além da tecnologia de comunicação, cada implementação depende do servidor utilizado, do modelo de concorrência da linguagem e da eficiência das bibliotecas responsáveis por serializar, desserializar e responder as requisições.
+
 ---
 
 ## 5. Testes de Carga
 
 ### Metodologia
 
-O benchmark (`loadtest/loadtest.py`) sobe cada servidor isoladamente, aplica carga com N threads simultâneas por 5 segundos e mede:
+O benchmark foi executado pelo script `loadtest/loadtest.py`. Para cada tecnologia, o servidor correspondente foi iniciado isoladamente e recebeu requisições simultâneas durante 5 segundos. O objetivo foi medir o comportamento de cada implementação sob diferentes níveis de concorrência.
 
-- **Vazão** (req/s): requisições completadas por segundo
-- **Latência média** (avg_ms)
-- **Latência p95** (ms): 95% das requisições completam abaixo deste valor
-- **Erros**: requisições que falharam
+Foram avaliadas as seguintes métricas:
 
-**Operações testadas:**
-- `listMusics` — retorna as 500 músicas (payload grande, estressa serialização/transferência)
-- `musicsByPlaylist` — retorna ~22 músicas de uma playlist (payload pequeno, estressa overhead por requisição)
+- **Vazão (req/s):** quantidade de requisições concluídas por segundo. Quanto maior esse valor, melhor o desempenho.
+- **Latência média (avg_ms):** tempo médio de resposta das requisições. Quanto menor esse valor, melhor.
+- **Latência p95 (ms):** indica que 95% das requisições foram concluídas abaixo daquele tempo. Essa métrica é importante porque mostra o comportamento das requisições mais lentas.
+- **Erros:** requisições que falharam durante o teste, como timeouts, falhas de conexão ou respostas não concluídas corretamente.
 
-**Níveis de concorrência:** 10, 50, 100 e 200 threads simultâneas
+Foram testadas duas operações principais:
+
+- `listMusics`: retorna todas as 500 músicas cadastradas. Essa operação possui payload grande e estressa principalmente a serialização, a transferência de dados e o processamento da resposta.
+- `musicsByPlaylist`: retorna aproximadamente 22 músicas de uma playlist. Essa operação possui payload menor e evidencia melhor o overhead fixo de cada tecnologia por requisição.
+
+Os níveis de concorrência utilizados foram 10, 50, 100 e 200 threads simultâneas.
+
+Antes de interpretar os resultados, é importante observar que maior vazão indica melhor capacidade de atendimento, enquanto menor latência indica respostas mais rápidas. Já a presença do símbolo ⚠ nas tabelas indica que ocorreram erros naquele cenário, portanto os resultados devem ser analisados com cautela.
 
 ---
 
@@ -419,20 +433,106 @@ O benchmark (`loadtest/loadtest.py`) sobe cada servidor isoladamente, aplica car
 
 ![Vazão vs carga listMusics](loadtest/results/throughput_vs_carga_listMusics.png)
 
-#### Tabela numérica — `listMusics` (req/s)
+#### Tabela numérica — `listMusics` — Vazão (req/s)
 
 ```
-Tecnologia       │  c=10  │  c=50  │  c=100  │  c=200
-─────────────────┼────────┼────────┼─────────┼────────
-Node  / gRPC     │ 2008.1 │ 2289.4 │  2351.9 │  2438.5
-Node  / REST     │ 1164.6 │ 1095.3 │  1093.0 │  1065.8
-Python/ gRPC     │  865.4 │  841.2 │   846.8 │   882.2
-Node  / GraphQL  │  374.7 │  393.9 │   388.3 │   398.3
-Node  / SOAP     │  375.7 │  383.1 │   390.7 │   386.4
-Python/ REST     │  371.1 │  367.8 │   367.1 │   361.9
-Python/ GraphQL  │   40.1 │   61.7 │    56.2 │    54.6  ⚠ erros
-Python/ SOAP     │   28.1 │   29.2 │    35.0 │    34.0  ⚠ erros
+Tecnologia       │   c=10  │   c=50  │  c=100  │  c=200
+─────────────────┼─────────┼─────────┼─────────┼─────────
+Node  / gRPC     │ 1563.0  │ 1752.3  │  1738.9 │  1758.5
+Node  / GraphQL  │  321.8  │  326.9  │   326.9 │   335.6
+Node  / SOAP     │  262.6  │  302.0  │   295.8 │   297.6
+Python/ gRPC     │  234.6  │  197.5  │   194.9 │   197.4
+Python/ REST     │  198.6  │  194.3  │   193.4 │   188.9
+Node  / REST     │  134.0  │  271.7  │   333.6 │   303.4
+Python/ GraphQL  │   18.8  │   17.9  │    19.8 │    17.9  ⚠ erros
+Python/ SOAP     │    5.7  │    6.9  │     5.7 │     5.4  ⚠ erros
 ```
+
+#### Tabela numérica — `listMusics` — Latência média (avg_ms)
+
+```
+Tecnologia       │   c=10  │   c=50  │  c=100  │  c=200
+─────────────────┼─────────┼─────────┼─────────┼─────────
+Node  / gRPC     │    6.4  │   28.4  │   56.9  │  111.8
+Node  / GraphQL  │   31.0  │  149.7  │  293.2  │  549.7
+Node  / SOAP     │   37.9  │  162.1  │  323.5  │  620.9
+Python/ gRPC     │   42.3  │  244.7  │  479.2  │  892.9
+Python/ REST     │   50.1  │  248.5  │  482.0  │  879.4
+Node  / REST     │   68.5  │  165.8  │  273.5  │  421.7
+Python/ GraphQL  │  500.8  │ 1204.6  │ 1202.4  │ 1495.0  ⚠ erros
+Python/ SOAP     │ 1633.9  │ 2074.1  │ 2700.1  │ 2987.6  ⚠ erros
+```
+
+#### Tabela numérica — `listMusics` — Latência p95 (ms)
+
+```
+Tecnologia       │   c=10  │   c=50  │  c=100  │  c=200
+─────────────────┼─────────┼─────────┼─────────┼─────────
+Node  / gRPC     │    8.2  │   35.5  │   74.3  │  149.7
+Node  / GraphQL  │   35.9  │  168.8  │  422.1  │  758.3
+Node  / SOAP     │   47.5  │  175.2  │  422.6  │  808.9
+Python/ gRPC     │   61.8  │  295.3  │  566.8  │ 1119.0
+Python/ REST     │   55.8  │  272.9  │  602.3  │ 2409.6
+Node  / REST     │  166.4  │  301.0  │  430.2  │  698.0
+Python/ GraphQL  │ 1396.6  │ 2530.4  │ 2475.9  │ 2584.4  ⚠ erros
+Python/ SOAP     │ 2311.8  │ 3049.3  │ 4130.6  │ 4363.8  ⚠ erros
+```
+
+#### Interpretação dos resultados — `listMusics`
+
+Na operação `listMusics`, o payload é grande porque a resposta contém 500 músicas. Por isso, tecnologias com serialização mais eficiente tendem a se destacar. O melhor desempenho foi obtido pelo gRPC em Node.js, que manteve vazão acima de 1500 req/s em todos os níveis de concorrência e apresentou as menores latências.
+
+O GraphQL em Node.js também teve bom desempenho, ficando próximo ou acima do REST em alguns cenários. Isso mostra que, mesmo tendo um custo adicional de interpretação da query, a implementação em Node.js conseguiu lidar bem com o volume de requisições.
+
+O REST apresentou comportamento estável, principalmente em Python e Node.js, sem erros registrados nas tabelas. Apesar de não ter alcançado a vazão do gRPC, manteve desempenho previsível.
+
+O SOAP em Python foi o pior cenário para payload grande, com baixa vazão e alta latência. Isso ocorre porque o XML usado pelo SOAP é mais verboso, aumentando o custo de processamento e o tamanho das mensagens. Além disso, a implementação Python apresentou erros sob carga, indicando limitação do servidor utilizado no benchmark.
+
+O símbolo ⚠ indica que ocorreram falhas durante os testes daquele cenário. Portanto, os resultados marcados com esse símbolo não devem ser comparados apenas pela vazão ou latência, pois a presença de erros mostra instabilidade na execução.
+
+#### Comparativo por linguagem — Node.js
+
+As quatro tecnologias isoladas no Node.js: permite comparar REST × GraphQL × gRPC × SOAP eliminando a variável da linguagem.
+
+![Vazão por API — Node.js — listMusics](loadtest/results/throughput_lang_node_listMusics.png)
+
+![Latência p95 por API — Node.js — listMusics](loadtest/results/latency_lang_node_listMusics.png)
+
+#### Comparativo por linguagem — Python
+
+As quatro tecnologias isoladas no Python: destaca o gargalo do WSGI síncrono no GraphQL e SOAP sob carga alta.
+
+![Vazão por API — Python — listMusics](loadtest/results/throughput_lang_python_listMusics.png)
+
+![Latência p95 por API — Python — listMusics](loadtest/results/latency_lang_python_listMusics.png)
+
+#### Python vs Node — por tecnologia
+
+Cada gráfico isola uma tecnologia e compara diretamente Python contra Node.js nos quatro níveis de concorrência.
+
+##### REST
+
+![Vazão — REST — listMusics](loadtest/results/throughput_tech_rest_listMusics.png)
+
+![Latência p95 — REST — listMusics](loadtest/results/latency_tech_rest_listMusics.png)
+
+##### GraphQL
+
+![Vazão — GraphQL — listMusics](loadtest/results/throughput_tech_graphql_listMusics.png)
+
+![Latência p95 — GraphQL — listMusics](loadtest/results/latency_tech_graphql_listMusics.png)
+
+##### gRPC
+
+![Vazão — gRPC — listMusics](loadtest/results/throughput_tech_grpc_listMusics.png)
+
+![Latência p95 — gRPC — listMusics](loadtest/results/latency_tech_grpc_listMusics.png)
+
+##### SOAP
+
+![Vazão — SOAP — listMusics](loadtest/results/throughput_tech_soap_listMusics.png)
+
+![Latência p95 — SOAP — listMusics](loadtest/results/latency_tech_soap_listMusics.png)
 
 ---
 
@@ -450,20 +550,108 @@ Python/ SOAP     │   28.1 │   29.2 │    35.0 │    34.0  ⚠ erros
 
 ![Vazão vs carga musicsByPlaylist](loadtest/results/throughput_vs_carga_musicsByPlaylist.png)
 
-#### Tabela numérica — `musicsByPlaylist` (req/s)
+#### Tabela numérica — `musicsByPlaylist` — Vazão (req/s)
 
 ```
 Tecnologia       │   c=10  │   c=50  │  c=100  │  c=200
 ─────────────────┼─────────┼─────────┼─────────┼─────────
-Node  / gRPC     │  7287.8 │  9284.3 │  8864.7 │  8611.4
-Python/ gRPC     │  3482.2 │  3581.8 │  3731.5 │  3565.9
-Node  / REST     │  1341.7 │  1263.6 │  1300.2 │  1280.0
-Node  / SOAP     │  1359.8 │  1305.3 │  1257.8 │  1218.4
-Node  / GraphQL  │  1165.0 │  1114.9 │  1020.2 │   998.5
-Python/ REST     │   500.8 │   513.4 │   417.9 │     2.0  ⚠ erros
-Python/ SOAP     │   330.9 │   314.5 │   318.1 │   297.5
-Python/ GraphQL  │    70.6 │    24.2 │    39.4 │    62.3  ⚠ erros
+Node  / gRPC     │ 5455.5  │ 5989.8  │  6703.6 │  7015.7
+Python/ gRPC     │ 1603.7  │ 1950.6  │  2000.1 │  2027.0
+Node  / SOAP     │ 1238.2  │  944.8  │   907.9 │   980.9
+Node  / GraphQL  │ 1015.8  │  864.3  │   803.4 │  1004.4
+Node  / REST     │  520.0  │  586.5  │   679.2 │  1144.8
+Python/ REST     │  321.1  │  326.4  │   325.4 │   307.1
+Python/ GraphQL  │   95.3  │   85.2  │    92.4 │    95.1  ⚠ erros
+Python/ SOAP     │   85.7  │  273.2  │     0.4 │   148.1  ⚠ erros
 ```
+
+#### Tabela numérica — `musicsByPlaylist` — Latência média (avg_ms)
+
+```
+Tecnologia       │   c=10  │   c=50  │  c=100  │  c=200
+─────────────────┼─────────┼─────────┼─────────┼─────────
+Node  / gRPC     │    1.8  │    8.3  │   14.5  │   26.1
+Python/ gRPC     │    6.2  │   25.4  │   48.8  │   95.1
+Node  / SOAP     │    8.1  │   51.7  │  100.3  │  169.1
+Node  / GraphQL  │    9.8  │   56.4  │  113.4  │  162.0
+Node  / REST     │   19.1  │   80.2  │  131.9  │  142.2
+Python/ REST     │   31.0  │  148.9  │  290.8  │  581.8
+Python/ GraphQL  │   95.4  │  426.4  │  646.6  │  921.5  ⚠ erros
+Python/ SOAP     │  110.8  │  136.2  │>150000  │  699.0  ⚠ erros
+```
+
+#### Tabela numérica — `musicsByPlaylist` — Latência p95 (ms)
+
+```
+Tecnologia       │   c=10  │   c=50  │  c=100  │  c=200
+─────────────────┼─────────┼─────────┼─────────┼─────────
+Node  / gRPC     │    2.6  │   14.5  │   25.1  │   48.7
+Python/ gRPC     │   13.8  │   30.7  │   53.0  │  101.4
+Node  / SOAP     │   13.5  │   84.8  │  160.6  │  317.9
+Node  / GraphQL  │   15.6  │   89.5  │  189.7  │  311.1
+Node  / REST     │   33.3  │  128.7  │  223.7  │  260.3
+Python/ REST     │   35.5  │  165.8  │  327.9  │ 1433.9
+Python/ GraphQL  │  519.8  │ 2079.3  │ 1706.8  │ 2134.2  ⚠ erros
+Python/ SOAP     │  170.9  │  706.4  │>2400000 │ 2116.7  ⚠ erros
+```
+
+#### Interpretação dos resultados — `musicsByPlaylist`
+
+Na operação `musicsByPlaylist`, o payload é menor, pois a resposta retorna cerca de 22 músicas. Nesse caso, o custo fixo de cada tecnologia fica mais evidente, já que a transferência de dados pesa menos do que em `listMusics`.
+
+O gRPC novamente apresentou o melhor desempenho geral. Em Node.js, alcançou até 7015.7 req/s com concorrência 200, mantendo latência média baixa mesmo sob carga elevada. Isso reforça a vantagem do uso de HTTP/2 e Protocol Buffers em cenários de alta concorrência.
+
+O gRPC em Python também teve bom resultado, ficando acima das demais tecnologias em Python. Isso mostra que a implementação gRPC conseguiu aproveitar melhor a comunicação binária mesmo fora do ambiente Node.js.
+
+Em Node.js, SOAP, GraphQL e REST tiveram desempenhos mais próximos entre si para payload pequeno. O SOAP em Node.js, apesar de teoricamente mais pesado por usar XML, apresentou boa vazão nesse cenário específico. Isso sugere que, para respostas pequenas, o overhead do XML teve impacto menor.
+
+Em Python, REST foi mais estável que GraphQL e SOAP. GraphQL e SOAP apresentaram erros, especialmente sob cargas maiores, indicando que a implementação Python usada no teste não lidou bem com alta concorrência nesses casos.
+
+O resultado extremo do SOAP em Python com concorrência 100, especialmente na latência p95, indica forte instabilidade. Por isso, esse ponto deve ser tratado como anomalia experimental e não como desempenho normal da tecnologia.
+
+#### Comparativo por linguagem — Node.js
+
+As quatro tecnologias isoladas no Node.js: com payload pequeno, gRPC domina, mas SOAP e GraphQL ficam muito próximos do REST.
+
+![Vazão por API — Node.js — musicsByPlaylist](loadtest/results/throughput_lang_node_musicsByPlaylist.png)
+
+![Latência p95 por API — Node.js — musicsByPlaylist](loadtest/results/latency_lang_node_musicsByPlaylist.png)
+
+#### Comparativo por linguagem — Python
+
+As quatro tecnologias isoladas no Python: gRPC também lidera, enquanto SOAP e GraphQL mostram instabilidade sob alta concorrência.
+
+![Vazão por API — Python — musicsByPlaylist](loadtest/results/throughput_lang_python_musicsByPlaylist.png)
+
+![Latência p95 por API — Python — musicsByPlaylist](loadtest/results/latency_lang_python_musicsByPlaylist.png)
+
+#### Python vs Node — por tecnologia
+
+Cada gráfico isola uma tecnologia e compara diretamente Python contra Node.js nos quatro níveis de concorrência.
+
+##### REST
+
+![Vazão — REST — musicsByPlaylist](loadtest/results/throughput_tech_rest_musicsByPlaylist.png)
+
+![Latência p95 — REST — musicsByPlaylist](loadtest/results/latency_tech_rest_musicsByPlaylist.png)
+
+##### GraphQL
+
+![Vazão — GraphQL — musicsByPlaylist](loadtest/results/throughput_tech_graphql_musicsByPlaylist.png)
+
+![Latência p95 — GraphQL — musicsByPlaylist](loadtest/results/latency_tech_graphql_musicsByPlaylist.png)
+
+##### gRPC
+
+![Vazão — gRPC — musicsByPlaylist](loadtest/results/throughput_tech_grpc_musicsByPlaylist.png)
+
+![Latência p95 — gRPC — musicsByPlaylist](loadtest/results/latency_tech_grpc_musicsByPlaylist.png)
+
+##### SOAP
+
+![Vazão — SOAP — musicsByPlaylist](loadtest/results/throughput_tech_soap_musicsByPlaylist.png)
+
+![Latência p95 — SOAP — musicsByPlaylist](loadtest/results/latency_tech_soap_musicsByPlaylist.png)
 
 ---
 
@@ -471,16 +659,20 @@ Python/ GraphQL  │    70.6 │    24.2 │    39.4 │    62.3  ⚠ erros
 
 ### Performance
 
-**gRPC** foi a tecnologia mais rápida em todos os cenários, chegando a **8.864 req/s** (Node.js, `musicsByPlaylist`, c=100). Os dois fatores principais são:
+**gRPC** foi a tecnologia mais rápida nos dois cenários testados. Em `musicsByPlaylist`, com payload pequeno, o gRPC em Node.js alcançou até **7015.7 req/s** com concorrência 200. Em `listMusics`, com payload grande, também liderou, mantendo vazão acima de **1500 req/s** em todos os níveis de carga.
 
-1. **Serialização binária (Protocol Buffers):** muito mais compacta e rápida de serializar/deserializar que JSON ou XML
-2. **HTTP/2:** multiplexing de requisições em uma única conexão TCP, sem head-of-line blocking
+Esse desempenho pode ser explicado principalmente por dois fatores:
 
-**REST** ficou em segundo lugar, com performance consistente e sem erros em todos os cenários do Node.js. O Node.js (event loop assíncrono) performou 3× melhor que Python (threads síncronas + GIL).
+1. **Protocol Buffers:** formato binário mais compacto e eficiente que JSON e XML.
+2. **HTTP/2:** permite melhor uso da conexão, multiplexação e menor overhead em comparação com abordagens HTTP tradicionais.
 
-**GraphQL** no Node.js teve performance similar ao REST para payloads pequenos, mas sofreu queda em payloads grandes — o overhead de parsing do schema SDL por requisição se torna relevante. O Python com Ariadne (WSGI síncrono) apresentou erros significativos sob carga alta.
+**REST** apresentou comportamento consistente e previsível. Em geral, não foi a tecnologia mais rápida, mas demonstrou estabilidade e simplicidade. Isso reforça o motivo de REST ser amplamente utilizado em APIs públicas e aplicações web/mobile.
 
-**SOAP** foi o pior para payloads grandes: apenas 35 req/s em Python com latência média de 1.031ms. O XML verboso aumenta drasticamente o custo de serialização e o tamanho da resposta. Em Node.js, porém, performou de forma surpreendentemente competitiva com REST e GraphQL.
+**GraphQL** teve desempenho competitivo em Node.js, principalmente no cenário de payload pequeno. Porém, no payload grande, o custo de processar queries e resolver campos se torna mais perceptível. Em Python, a implementação com Ariadne apresentou instabilidade sob carga, com erros registrados nos testes.
+
+**SOAP** apresentou desempenho mais limitado, principalmente em Python e no cenário de payload grande. Na operação `listMusics`, o SOAP em Python ficou entre **5.4 e 6.9 req/s**, com latência média entre **1633.9 ms e 2987.6 ms**. Esse resultado está relacionado ao uso de XML, que torna as mensagens maiores e aumenta o custo de serialização e desserialização.
+
+Em Node.js, o SOAP teve resultado melhor do que em Python, especialmente no cenário de payload pequeno. Mesmo assim, por ser mais verboso e menos simples de depurar, SOAP tende a ser menos indicado para APIs modernas quando não há exigência de contrato formal, WS-Security ou compatibilidade com sistemas legados.
 
 ### Experiência de desenvolvimento
 
@@ -513,7 +705,31 @@ Python/ GraphQL  │    70.6 │    24.2 │    39.4 │    62.3  ⚠ erros
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-> **Nota metodológica:** os servidores HTTP em Python rodam no WSGI de desenvolvimento (`wsgiref`), que satura sob alta concorrência. Em produção usaria-se `gunicorn`/`waitress`. Isso explica os erros do Python sob c=100–200, mas não muda a ordem geral (gRPC > REST > GraphQL > SOAP).
+### Limitações dos testes
+
+Os resultados obtidos representam o comportamento das implementações neste ambiente específico de teste. Portanto, eles não devem ser interpretados como uma verdade absoluta sobre cada tecnologia.
+
+Alguns fatores podem influenciar os resultados:
+
+- linguagem utilizada;
+- biblioteca escolhida para cada tecnologia;
+- servidor HTTP utilizado;
+- modelo de concorrência de Python e Node.js;
+- tamanho do payload retornado;
+- tempo de duração do benchmark;
+- hardware da máquina onde os testes foram executados.
+
+Além disso, os servidores Python HTTP utilizados nos testes rodam em ambiente de desenvolvimento, o que pode limitar o desempenho sob alta concorrência. Em um ambiente de produção, seria recomendado utilizar servidores como `gunicorn`, `uvicorn` ou `waitress`, dependendo da tecnologia utilizada.
+
+Mesmo com essas limitações, os testes são úteis porque todas as implementações foram comparadas com o mesmo conjunto de dados, as mesmas operações e os mesmos níveis de concorrência.
+
+> **Nota metodológica:** os servidores HTTP em Python utilizados neste projeto rodam com servidores de desenvolvimento, como `wsgiref`, que não são ideais para cenários de alta concorrência. Isso ajuda a explicar os erros observados principalmente em GraphQL e SOAP sob cargas maiores. Em produção, o resultado poderia melhorar com servidores mais robustos, como `gunicorn`, `uvicorn` ou `waitress`. Ainda assim, os testes mostram uma tendência geral consistente: gRPC apresentou a melhor performance, REST foi estável, GraphQL teve bom desempenho em Node.js e SOAP sofreu mais com payloads grandes e XML.
+
+### Conclusão da análise
+
+A partir dos testes realizados, é possível concluir que a escolha da tecnologia de invocação remota depende do objetivo do sistema. Para máxima performance e comunicação interna entre serviços, gRPC foi a melhor opção. Para APIs públicas e de fácil consumo, REST continua sendo uma escolha equilibrada. Para aplicações em que o cliente precisa controlar exatamente os dados retornados, GraphQL é uma alternativa interessante. Já SOAP se mostra mais adequado para contextos corporativos, sistemas legados e integrações que exigem contratos formais e padrões específicos de segurança.
+
+Portanto, não existe uma tecnologia universalmente melhor em todos os casos. A melhor escolha depende de fatores como desempenho esperado, facilidade de desenvolvimento, compatibilidade com clientes, necessidade de contrato formal e tipo de aplicação.
 
 ---
 
@@ -528,7 +744,7 @@ Python/ GraphQL  │    70.6 │    24.2 │    39.4 │    62.3  ⚠ erros
 
 ```bash
 # Python
-.venv/Scripts/python -m pip install flask ariadne grpcio grpcio-tools spyne lxml requests
+.venv/Scripts/python -m pip install -r python/requirements.txt
 
 # Node.js
 cd node && npm install
